@@ -18,6 +18,11 @@
 // LeftLiftMotor        motor         5               
 // RightLiftMotor       motor         6               
 // GrabMotor            motor         7               
+// LeftRangeFinder      sonar         A, B            
+// RightRangeFinder     sonar         C, D            
+// LeftLineTracker      line          E               
+// RightLineTracker     line          F               
+// Vision               vision        8               
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
@@ -31,16 +36,12 @@ competition Competition;
 
 int gearRatio = 1;
 bool calibration = true;
+bool buttonAPushed = false;
+bool liftActive = false;
 
-class armState {
-  const float start = 210;
-  const float opened = 80;
-  const float closed = 50;
-};
-
-const float liftState[] = {-600, -500, -380, -300, -220, -640};
+const float liftState[] = {40, 80, 240, 380, 500, 640};
 int currentLiftState;
-const float armState[] = {50, 80};
+const float armState[] = {-120, -280};
 int currentArmState;
 
 /*---------------------------------------------------------------------------*/
@@ -52,6 +53,9 @@ int currentArmState;
 /*  function is only called once after the V5 has been powered on and        */
 /*  not every time that the robot is disabled.                               */
 /*---------------------------------------------------------------------------*/
+
+void nothing() {}
+
 void pre_auton(void) {
   // Initializing Robot Configuration. DO NOT REMOVE!
   vexcodeInit();
@@ -101,6 +105,8 @@ void autoLift(int level) {
 
 void autoGrab(float armPosition) {
   currentArmState = armPosition;
+  GrabMotor.setVelocity(-100, velocityUnits::rpm);
+  GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
 }
 
 void controlRobot() {
@@ -117,62 +123,70 @@ void controlRobot() {
 }
 
 void controlLift() {
+  if (Controller1.Axis2.value() != 0 && liftActive == false) {
+    if (Controller1.Axis2.value() > 0 && currentLiftState < 6 - 1) {
+      currentLiftState++;
+    }
+    else if (Controller1.Axis2.value() < 0 && currentLiftState > 0) {
+      currentLiftState--;
+    }
+    liftActive = true;
+    cout << currentLiftState;
+    cout << " \n";
+  }
+  else if (Controller1.Axis2.value() == 0 && liftActive == true) {
+    liftActive = false;
+  }
   LeftLiftMotor.setVelocity(-100, velocityUnits::rpm);
   RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
-  LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg);
-  RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg);
+  LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
+  RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
 
-  float liftSpeed = Controller1.Axis2.value();
+  //float liftSpeed = Controller1.Axis2.value();
 }
 
 void controlGrab() {
-  float grabSpeed = Controller1.Axis1.value()/2;
-  GrabMotor.setVelocity(grabSpeed, velocityUnits::rpm);
-  GrabMotor.spin(directionType::fwd);
-}
-
-void calibrateLift() {
-  cout << "Start Calibrate\n";
-  LeftLiftMotor.setVelocity(100, velocityUnits::rpm);
-  LeftLiftMotor.spin(directionType::fwd);
-  RightLiftMotor.setVelocity(100, velocityUnits::rpm);
-  RightLiftMotor.spin(directionType::fwd);
-  cout << "Motor Move\n";
-
-  wait(100, msec);
-  cout << LeftLiftMotor.current();
-  while(LeftLiftMotor.velocity(velocityUnits::rpm) > 20) {} cout << LeftLiftMotor.current();
-  cout << "Motor Loop ended\n";
-  wait(1000, msec);
-  LeftLiftMotor.resetPosition();
-  LeftLiftMotor.resetRotation();
-  RightLiftMotor.resetPosition();
-  RightLiftMotor.resetRotation();
-  LeftLiftMotor.setVelocity(0, velocityUnits::rpm);
-  LeftLiftMotor.spin(directionType::fwd);
-  RightLiftMotor.setVelocity(0, velocityUnits::rpm);
-  RightLiftMotor.spin(directionType::fwd);
-  cout << "Motor Stop\n";
-  
+  if (Controller1.ButtonA.pressing() == true && buttonAPushed == false && armState[currentArmState] != armState[0]) {
+    cout << "Arm closed\n";
+    buttonAPushed = true;
+    autoGrab(0);
+  }
+  else if (Controller1.ButtonA.pressing() == true && buttonAPushed == false && armState[currentArmState] != armState[1]) {
+    cout << "Arm open\n";
+    buttonAPushed = true;
+    autoGrab(1);
+  }
+  else if (Controller1.ButtonA.pressing() == false && buttonAPushed == true) {
+    buttonAPushed = false;
+  }
+  /*if (currentArmState == 0) {
+    cout << "Arm open\n";
+    autoGrab(1);
+  }
+  else if (currentArmState == 1 && ButtonA == 0) {
+    cout << "Arm clossed\n";
+    autoGrab(0);
+  }*/
 }
 
 void calibrateArm() {
   cout << LeftLiftMotor.position(rotationUnits::deg);
   cout << "Calibrate Arm\n";
-  autoLift(1);
-  while(LeftLiftMotor.isSpinning() == true) {}
+  autoLift(3);
+  wait(500, msec);
+  while(LeftLiftMotor.velocity(velocityUnits::rpm) > 20) {}
   GrabMotor.setVelocity(100, velocityUnits::rpm);
   GrabMotor.spin(directionType::fwd);
-  wait(100, msec);
-  while(GrabMotor.velocity(velocityUnits::rpm) > 25) {}
-
-  GrabMotor.setVelocity(0, velocityUnits::rpm);
-  GrabMotor.spin(directionType::fwd);
+  wait(500, msec);
+  while(GrabMotor.velocity(velocityUnits::rpm) > 2) {}
+  cout << "Arm reset\n";
   GrabMotor.resetRotation();
   GrabMotor.resetPosition();
-  wait(1000, msec);
-  autoLift(4);
-  calibration = false;
+  GrabMotor.setVelocity(0, velocityUnits::rpm);
+  GrabMotor.spin(directionType::fwd);
+  cout << "ending calibration\n";
+  autoLift(0);
+  autoGrab(1);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -186,8 +200,8 @@ void calibrateArm() {
 /*---------------------------------------------------------------------------*/
 void autonomous(void) {
   cout << "auto\n";
-  calibrateLift();
   calibrateArm();
+  calibration = false;
 }
 
 /*---------------------------------------------------------------------------*/
