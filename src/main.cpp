@@ -45,7 +45,11 @@ bool liftActive = false;
 const float lineTrackingWhiteKP = 0.05;
 const int avgLineFollowVel = 50;
 const float lineTrackingWhiteKD = 1;
-float prevLTError = 0;
+float prevLTWError = 0;
+
+const float lineTrackingBlackKP = 0.05;
+const float lineTrackingBlackKD = 1;
+float prevLTBError = 0;
 
 const float liftState[] = {40, 80, 240, 380, 500, 640};
 int currentLiftState;
@@ -55,9 +59,13 @@ int currentArmState;
 int prevRightLineVal;
 int prevLeftLineVal;
 
-enum {WAITING, SEARCHING, MOVINGSTRAIGHT, TURNING, LINEFOLLOW, LIFTING, GRABBING};
+enum {RAMP, WAITING, PIZZASEARCH, DORMSEARCH, APPROACHING, LIFTING, GRABBING, RELEASING};
 
-int currentState = WAITING;
+int currentDorm = 0;
+
+int currentState = RAMP;
+
+bool reverseMovement = false;
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -87,8 +95,8 @@ void lineTrackingWhite() {
 
   int error = curRightTrackerVal-curLeftTrackerVal;
 
-  float effort = lineTrackingWhiteKP*error + lineTrackingWhiteKD*prevLTError;
-  prevLTError = error;
+  float effort = lineTrackingWhiteKP*error + lineTrackingWhiteKD*prevLTWError;
+  prevLTWError = error;
 
   float newVelRight = avgLineFollowVel + effort;
   float newVelLeft = avgLineFollowVel - effort;
@@ -98,6 +106,38 @@ void lineTrackingWhite() {
 
   FrontLeftMotor.setVelocity(newVelLeft*gearRatio, velocityUnits::rpm);
   BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
+}
+
+void lineTrackingBlack() {
+  int curRightTrackerVal = RightLineTracker.reflectivity();
+  int curLeftTrackerVal = LeftLineTracker.reflectivity();
+
+  int error = curRightTrackerVal-curLeftTrackerVal;
+
+  float effort = lineTrackingBlackKP*error + lineTrackingBlackKD*prevLTBError;
+  prevLTBError = error;
+
+  float newVelRight = avgLineFollowVel + effort;
+  float newVelLeft = avgLineFollowVel - effort;
+
+  FrontRightMotor.setVelocity(newVelRight*gearRatio, velocityUnits::rpm);
+  BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
+
+  FrontLeftMotor.setVelocity(newVelLeft*gearRatio, velocityUnits::rpm);
+  BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
+}
+
+bool checkLineTrack() {
+  bool retVal = false;
+  if (currentState == PIZZASEARCH || currentState == RAMP) {
+    retVal = true;
+  }
+  return retVal;
+}
+
+void handleLineTrack() {
+  if (currentState == PIZZASEARCH) lineTrackingWhite();
+  else if (currentState == RAMP) lineTrackingBlack();
 }
 
 void autoStraight(float rotationSpeed, bool forward) {
@@ -162,6 +202,18 @@ void handleGrab() {
   }
 }
 
+bool checkGrabAuto() {
+  bool retVal = false;
+
+  Vision.takeSnapshot(Vision__PIZZABOX);
+  if (Vision.objectCount > 0) retVal = true;
+
+  Vision.takeSnapshot(Vision__GOLDENPIZZA);
+  if (Vision.objectCount > 0) retVal = true;
+
+  return retVal;
+}
+
 void handleRobotControl() {
   float straightSpeed = Controller1.Axis3.value();
   float turnSpeed = Controller1.Axis4.value();
@@ -224,12 +276,6 @@ bool checkGrabControl() {
   return retVal;
 }
 
-void checkGrabAuto() {
-  Vision.takeSnapshot(Vision__PIZZABOX);
-  
-  cout << Vision.objectCount << endl;
-}
-
 void calibrateArm() {
   cout << LeftLiftMotor.position(rotationUnits::deg);
   cout << "Calibrate Arm\n";
@@ -267,15 +313,8 @@ void autonomous(void) {
   cout << "auto\n";
   //calibrateArm();
   calibration = false;
-  bool complete = false;
 
-  while (!complete) {
-    if (movementChecker()) lineTrackingWhite();
-      FrontRightMotor.spin(directionType::fwd);
-      FrontLeftMotor.spin(directionType::fwd);
-      BackRightMotor.spin(directionType::fwd);
-      BackLeftMotor.spin(directionType::fwd);
-  }
+  if (checkLineTrack()) handleLineTrack();
 }
 
 /*---------------------------------------------------------------------------*/
