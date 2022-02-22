@@ -34,16 +34,18 @@ using namespace std;
 // A global instance of competition
 competition Competition;
 
-sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
-sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
+//sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
+//sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
 
 int gearRatio = 1;
 bool calibration = true;
 bool buttonAPushed = false;
 bool liftActive = false;
 
-const float lineTrackingKP = 0.2;
+const float lineTrackingKP = 0.05;
 const int avgLineFollowVel = 50;
+const float lineTrackingKD = 1;
+float prevLTError = 0;
 
 const float liftState[] = {40, 80, 240, 380, 500, 640};
 int currentLiftState;
@@ -80,9 +82,12 @@ void lineTracking() {
   int curRightTrackerVal = 100-RightLineTracker.reflectivity();
   int curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
 
+  cout << curRightTrackerVal << endl;
+
   int error = curRightTrackerVal-curLeftTrackerVal;
 
-  float effort = lineTrackingKP*error;
+  float effort = lineTrackingKP*error + lineTrackingKD*prevLTError;
+  prevLTError = error;
 
   float newVelRight = avgLineFollowVel + effort;
   float newVelLeft = avgLineFollowVel - effort;
@@ -204,6 +209,8 @@ bool checkGrabControl() {
 
 void checkGrabAuto() {
   Vision.takeSnapshot(Vision__PIZZABOX);
+  
+  cout << Vision.objectCount << endl;
 }
 
 void calibrateArm() {
@@ -241,12 +248,16 @@ bool movementChecker() {
 /*---------------------------------------------------------------------------*/
 void autonomous(void) {
   cout << "auto\n";
-  calibrateArm();
+  //calibrateArm();
   calibration = false;
   bool complete = false;
 
   while (!complete) {
     if (movementChecker()) lineTracking();
+      FrontRightMotor.spin(directionType::fwd);
+      FrontLeftMotor.spin(directionType::fwd);
+      BackRightMotor.spin(directionType::fwd);
+      BackLeftMotor.spin(directionType::fwd);
   }
 }
 
