@@ -39,10 +39,16 @@ bool calibration = true;
 bool buttonAPushed = false;
 bool liftActive = false;
 
+const float lineTrackingKP = 0.2;
+const int avgLineFollowVel = 50;
+
 const float liftState[] = {40, 80, 240, 380, 500, 640};
 int currentLiftState;
 const float armState[] = {-120, -280};
 int currentArmState;
+
+int prevRightLineVal;
+int prevLeftLineVal;
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -64,6 +70,25 @@ void pre_auton(void) {
   // Example: clearing encoders, setting servo positions, ...
   // Do not put code here that will power any motors;  
   // it will not run
+}
+
+void lineTracking() {
+  task::sleep(100);
+  int curRightTrackerVal = 100-RightLineTracker.reflectivity();
+  int curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
+
+  int error = curRightTrackerVal-curLeftTrackerVal;
+
+  float effort = lineTrackingKP*error;
+
+  float newVelRight = avgLineFollowVel + effort;
+  float newVelLeft = avgLineFollowVel - effort;
+
+  FrontRightMotor.setVelocity(newVelRight*gearRatio, velocityUnits::rpm);
+  BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
+
+  FrontLeftMotor.setVelocity(newVelLeft*gearRatio, velocityUnits::rpm);
+  BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
 }
 
 void autoStraight(float rotationSpeed, bool forward) {
@@ -189,6 +214,10 @@ void calibrateArm() {
   autoGrab(1);
 }
 
+bool movementChecker() {
+  return true;
+}
+
 /*---------------------------------------------------------------------------*/
 /*                                                                           */
 /*                              Autonomous Task                              */
@@ -202,6 +231,11 @@ void autonomous(void) {
   cout << "auto\n";
   calibrateArm();
   calibration = false;
+  bool complete = false;
+
+  while (!complete) {
+    if (movementChecker()) lineTracking();
+  }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -229,69 +263,7 @@ void usercontrol(void) {
     // ........................................................................
     // You can also call functions from here; keep in mind they will loop
     wait(20, msec);
-    /*// int32_t is 4 byte signed integer value
-    int32_t Y = Controller1.Axis3.value() / 2;
-    int32_t X = Controller1.Axis4.value() / 2;
-    int32_t R = Controller1.Axis1.value() / 2;
-
-    int32_t frontMotorVal = Y + X + R;
-    int32_t backMotorVal = -Y + X + R;
-
-    //FrontMotors.setVelocity(frontMotorVal, vex::velocityUnits::pct);
-    //BackMotors.setVelocity(backMotorVal, vex::percentUnits::pct);
-
-    FrontMotors.setVelocity(5, vex::velocityUnits::rpm);
-    BackMotors.setVelocity(5, vex::velocityUnits::rpm);
-
-
-    bool armUp = Controller1.ButtonUp.pressing();
-    bool armDown = Controller1.ButtonDown.pressing();
-
-    bool clawRotateUp = Controller1.ButtonX.pressing();
-    bool clawRotateDown = Controller1.ButtonB.pressing();
-
-    bool closeClaw = Controller1.ButtonR1.pressing();
-    bool openClaw = Controller1.ButtonR2.pressing();
-
-    int armCase = (armUp) ? ((armDown) ? -1 : 1) : ((armDown) ? 2 : -1);
-    int clawRotateCase = (clawRotateUp) ? ((clawRotateDown) ? -1 : 1) : ((clawRotateDown) ? 2 : -1);
-    int clawCase = (closeClaw) ? ((openClaw) ? -1 : 1) : ((openClaw) ? 2 : -1);
-
-    switch (armCase) {
-      case 1:
-        // move arm up
-        break;
-      case 2:
-        // move arm down
-        break;
-      default: 
-        // do nothing
-        break;
-    }
-
-    switch (clawRotateCase) {
-      case 1:
-        // move claw up
-        break;
-      case 2:
-        // move claw down
-        break;
-      default: 
-        // do nothing
-        break;
-    }
-
-    switch (clawCase) {
-      case 1:
-        // close claw
-        break;
-      case 2:
-        // open claw
-        break;
-      default: 
-        // do nothing
-        break;
-    }*/
+    
     if (calibration == false) {
       controlRobot();
       controlLift();
