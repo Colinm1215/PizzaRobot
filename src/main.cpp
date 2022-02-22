@@ -26,13 +26,16 @@
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
-#include <iostream>;
+#include <iostream>
 
 using namespace vex;
 using namespace std;
 
 // A global instance of competition
 competition Competition;
+
+sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
+sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
 
 int gearRatio = 1;
 bool calibration = true;
@@ -134,6 +137,15 @@ void autoGrab(float armPosition) {
   GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
 }
 
+void handleGrab() {
+  int armPosition = (armState[currentArmState] != armState[0]) ? 0 : ((armState[currentArmState] != armState[1] ? 1 : -1));
+  if (armPosition != -1) {
+    currentArmState = armPosition;
+    GrabMotor.setVelocity(-100, velocityUnits::rpm);
+    GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
+  }
+}
+
 void controlRobot() {
   float straightSpeed = Controller1.Axis3.value()*2;
   float turnSpeed = Controller1.Axis4.value();
@@ -170,27 +182,37 @@ void controlLift() {
   //float liftSpeed = Controller1.Axis2.value();
 }
 
-void controlGrab() {
-  if (Controller1.ButtonA.pressing() == true && buttonAPushed == false && armState[currentArmState] != armState[0]) {
+void centerRobot() {
+  bool buttonX = Controller1.ButtonX.pressing();
+  if (buttonX == true) {
+    LeftLiftMotor.stop();
+    RightLiftMotor.stop();
+    const float kp = 0.2;
+    float speed = 2.0;
+    float leftDistance = LeftRangeFinder.distance(distanceUnits::cm)/100;
+    float rightDistance = RightRangeFinder.distance(distanceUnits::cm)/100;
+    float effort = leftDistance - rightDistance;
+    LeftLiftMotor.setVelocity(effort, velocityUnits::rpm);
+    RightLiftMotor.setVelocity(-effort, velocityUnits::rpm);
+  }
+}
+
+void checkGrab() {
+  bool buttonA = Controller1.ButtonA.pressing();
+  if (buttonA == true && buttonAPushed == false) {
     cout << "Arm closed\n";
     buttonAPushed = true;
-    autoGrab(0);
-  }
-  else if (Controller1.ButtonA.pressing() == true && buttonAPushed == false && armState[currentArmState] != armState[1]) {
-    cout << "Arm open\n";
-    buttonAPushed = true;
-    autoGrab(1);
-  }
-  else if (Controller1.ButtonA.pressing() == false && buttonAPushed == true) {
+    handleGrab();
+  } else if (buttonA == false && buttonAPushed == true) {
     buttonAPushed = false;
   }
   /*if (currentArmState == 0) {
     cout << "Arm open\n";
-    autoGrab(1);
+    handleGrab(1);
   }
   else if (currentArmState == 1 && ButtonA == 0) {
     cout << "Arm clossed\n";
-    autoGrab(0);
+    handleGrab(0);
   }*/
 }
 
