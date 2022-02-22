@@ -110,7 +110,6 @@ void autoStraight(float rotationSpeed, bool forward) {
 void autoTurn(float turnDegrees, bool left) {
   int direction = 1;
   if (left == false) direction = -1;
-  //FrontLeftMotor.rotateFor(90, rotationUnits::rev);
   FrontLeftMotor.rotateFor(-direction*turnDegrees*gearRatio, rotationUnits::rev);
   FrontRightMotor.rotateFor(direction*turnDegrees*gearRatio, rotationUnits::rev);
   BackLeftMotor.rotateFor(-direction*turnDegrees, rotationUnits::rev);
@@ -125,25 +124,12 @@ void autoLift(int level) {
     LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
     RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
   }
-  /*if (level == 0) {
-    LeftLiftMotor.setVelocity(0, velocityUnits::rpm);
-    RightLiftMotor.setVelocity(0, velocityUnits::rpm);
-  }*/
 }
 
 void autoGrab(float armPosition) {
   currentArmState = armPosition;
   GrabMotor.setVelocity(-100, velocityUnits::rpm);
   GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
-}
-
-void handleGrab() {
-  int armPosition = (armState[currentArmState] != armState[0]) ? 0 : ((armState[currentArmState] != armState[1] ? 1 : -1));
-  if (armPosition != -1) {
-    currentArmState = armPosition;
-    GrabMotor.setVelocity(-100, velocityUnits::rpm);
-    GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
-  }
 }
 
 void controlRobot() {
@@ -178,8 +164,6 @@ void controlLift() {
   RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
   LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
   RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
-
-  //float liftSpeed = Controller1.Axis2.value();
 }
 
 void centerRobot() {
@@ -197,23 +181,29 @@ void centerRobot() {
   }
 }
 
-void checkGrab() {
+void handleGrab() {
+  int armPosition = (armState[currentArmState] != armState[0]) ? 0 : ((armState[currentArmState] != armState[1] ? 1 : -1));
+  if (armPosition != -1) {
+    currentArmState = armPosition;
+    GrabMotor.setVelocity(-100, velocityUnits::rpm);
+    GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
+  }
+}
+
+bool checkGrabControl() {
   bool buttonA = Controller1.ButtonA.pressing();
+  bool retVal = false;
   if (buttonA == true && buttonAPushed == false) {
-    cout << "Arm closed\n";
     buttonAPushed = true;
-    handleGrab();
+    retVal = true;
   } else if (buttonA == false && buttonAPushed == true) {
     buttonAPushed = false;
   }
-  /*if (currentArmState == 0) {
-    cout << "Arm open\n";
-    handleGrab(1);
-  }
-  else if (currentArmState == 1 && ButtonA == 0) {
-    cout << "Arm clossed\n";
-    handleGrab(0);
-  }*/
+  return retVal;
+}
+
+void checkGrabAuto() {
+  Vision.takeSnapshot(Vision__PIZZABOX);
 }
 
 void calibrateArm() {
@@ -289,7 +279,7 @@ void usercontrol(void) {
     if (calibration == false) {
       controlRobot();
       controlLift();
-      controlGrab();
+      if (checkGrabControl()) handleGrab();
     }
     
   }
