@@ -42,9 +42,9 @@ bool calibration = true;
 bool buttonAPushed = false;
 bool liftActive = false;
 
-const float lineTrackingKP = 0.05;
+const float lineTrackingWhiteKP = 0.05;
 const int avgLineFollowVel = 50;
-const float lineTrackingKD = 1;
+const float lineTrackingWhiteKD = 1;
 float prevLTError = 0;
 
 const float liftState[] = {40, 80, 240, 380, 500, 640};
@@ -54,6 +54,10 @@ int currentArmState;
 
 int prevRightLineVal;
 int prevLeftLineVal;
+
+enum {WAITING, SEARCHING, MOVINGSTRAIGHT, TURNING, LINEFOLLOW, LIFTING, GRABBING};
+
+int currentState = WAITING;
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -77,16 +81,13 @@ void pre_auton(void) {
   // it will not run
 }
 
-void lineTracking() {
-  task::sleep(100);
+void lineTrackingWhite() {
   int curRightTrackerVal = 100-RightLineTracker.reflectivity();
   int curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
 
-  cout << curRightTrackerVal << endl;
-
   int error = curRightTrackerVal-curLeftTrackerVal;
 
-  float effort = lineTrackingKP*error + lineTrackingKD*prevLTError;
+  float effort = lineTrackingWhiteKP*error + lineTrackingWhiteKD*prevLTError;
   prevLTError = error;
 
   float newVelRight = avgLineFollowVel + effort;
@@ -137,40 +138,6 @@ void autoGrab(float armPosition) {
   GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
 }
 
-void controlRobot() {
-  float straightSpeed = Controller1.Axis3.value()*2;
-  float turnSpeed = Controller1.Axis4.value();
-  FrontLeftMotor.setVelocity(straightSpeed*gearRatio + turnSpeed*gearRatio, velocityUnits::rpm);
-  FrontLeftMotor.spin(directionType::fwd);
-  FrontRightMotor.setVelocity(straightSpeed*gearRatio - turnSpeed*gearRatio, velocityUnits::rpm);
-  FrontRightMotor.spin(directionType::fwd);
-  BackLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
-  BackLeftMotor.spin(directionType::fwd);
-  BackRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
-  BackRightMotor.spin(directionType::fwd);
-}
-
-void controlLift() {
-  if (Controller1.Axis2.value() != 0 && liftActive == false) {
-    if (Controller1.Axis2.value() > 0 && currentLiftState < 6 - 1) {
-      currentLiftState++;
-    }
-    else if (Controller1.Axis2.value() < 0 && currentLiftState > 0) {
-      currentLiftState--;
-    }
-    liftActive = true;
-    cout << currentLiftState;
-    cout << " \n";
-  }
-  else if (Controller1.Axis2.value() == 0 && liftActive == true) {
-    liftActive = false;
-  }
-  LeftLiftMotor.setVelocity(-100, velocityUnits::rpm);
-  RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
-  LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
-  RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
-}
-
 void centerRobot() {
   bool buttonX = Controller1.ButtonX.pressing();
   if (buttonX == true) {
@@ -193,6 +160,56 @@ void handleGrab() {
     GrabMotor.setVelocity(-100, velocityUnits::rpm);
     GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
   }
+}
+
+void handleRobotControl() {
+  float straightSpeed = Controller1.Axis3.value();
+  float turnSpeed = Controller1.Axis4.value();
+  FrontLeftMotor.setVelocity(straightSpeed*gearRatio + turnSpeed*gearRatio, velocityUnits::rpm);
+  FrontLeftMotor.spin(directionType::fwd);
+  FrontRightMotor.setVelocity(straightSpeed*gearRatio - turnSpeed*gearRatio, velocityUnits::rpm);
+  FrontRightMotor.spin(directionType::fwd);
+  BackLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
+  BackLeftMotor.spin(directionType::fwd);
+  BackRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
+  BackRightMotor.spin(directionType::fwd);
+}
+
+bool checkRobotControl() {
+  float straightSpeed = Controller1.Axis3.value();
+  float turnSpeed = Controller1.Axis4.value();
+  bool retVal = false;
+
+  if (straightSpeed != 0 || turnSpeed != 0) retVal = true;
+
+  return retVal;
+}
+
+void handleLiftControl() {
+  LeftLiftMotor.setVelocity(-100, velocityUnits::rpm);
+  RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
+  LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
+  RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
+}
+
+bool checkLiftControl() {
+  int retVal = false;
+  if (Controller1.Axis2.value() != 0 && liftActive == false) {
+    if (Controller1.Axis2.value() > 0 && currentLiftState < 6 - 1) {
+      currentLiftState++;
+    }
+    else if (Controller1.Axis2.value() < 0 && currentLiftState > 0) {
+      currentLiftState--;
+    }
+    liftActive = true;
+    retVal = true;
+    cout << currentLiftState;
+    cout << " \n";
+  }
+  else if (Controller1.Axis2.value() == 0 && liftActive == true) {
+    liftActive = false;
+  }
+  return retVal;
 }
 
 bool checkGrabControl() {
@@ -253,7 +270,7 @@ void autonomous(void) {
   bool complete = false;
 
   while (!complete) {
-    if (movementChecker()) lineTracking();
+    if (movementChecker()) lineTrackingWhite();
       FrontRightMotor.spin(directionType::fwd);
       FrontLeftMotor.spin(directionType::fwd);
       BackRightMotor.spin(directionType::fwd);
@@ -288,11 +305,10 @@ void usercontrol(void) {
     wait(20, msec);
     
     if (calibration == false) {
-      controlRobot();
-      controlLift();
+      if (checkRobotControl()) handleRobotControl();
+      if (checkLiftControl()) handleLiftControl();
       if (checkGrabControl()) handleGrab();
     }
-    
   }
 }
 
