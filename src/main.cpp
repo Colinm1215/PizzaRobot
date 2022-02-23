@@ -54,7 +54,7 @@ int currentArmState;
 int prevRightLineVal;
 int prevLeftLineVal;
 
-enum {RAMP, WAITING, PIZZASEARCH, DORMSEARCH, APPROACHING, LIFTING, GRABBING, RELEASING};
+enum {RAMP, WAITING, PIZZASEARCH, DORMSEARCH, APPROACHING, LIFTING, GRABBING, RELEASING, ATDORM};
 
 int currentDorm = 0;
 
@@ -186,11 +186,16 @@ void handleGrab() {
 bool checkGrabAuto() {
   bool retVal = false;
 
+  if (currentState == PIZZASEARCH) {
   Vision.takeSnapshot(Vision__PIZZABOX);
   if (Vision.objectCount > 0) retVal = true;
 
   Vision.takeSnapshot(Vision__GOLDENPIZZA);
   if (Vision.objectCount > 0) retVal = true;
+  currentState = GRABBING;
+  } else if (currentState == ATDORM) {
+    retVal = true;
+  }
 
   return retVal;
 }
