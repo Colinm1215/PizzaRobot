@@ -60,8 +60,6 @@ int prevLeftLineVal;
 
 enum {RAMP, WAITING, PIZZASEARCH, DORMSEARCH, APPROACHING, LIFTING, GRABBING, RELEASING};
 
-bool hasPizza = false;
-
 int currentDorm = 0;
 
 int currentState = RAMP;
