@@ -37,7 +37,6 @@ competition Competition;
 sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
 sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
 
-int gearRatio = 1;
 bool calibration = true;
 bool buttonAPushed = false;
 bool liftActive = false;
@@ -75,31 +74,35 @@ void pre_auton(void) {
   // it will not run
 }
 
-void lineTracking() {
-  task::sleep(100);
+void lineTracking(bool darkLine) {
   int curRightTrackerVal = 100-RightLineTracker.reflectivity();
   int curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
-
+  if (darkLine == true) {
+    curRightTrackerVal = 100-RightLineTracker.reflectivity();
+    curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
+  }
+  else {
+    curRightTrackerVal = RightLineTracker.reflectivity();
+    curLeftTrackerVal = LeftLineTracker.reflectivity();
+  }
+  
   int error = curRightTrackerVal-curLeftTrackerVal;
-
   float effort = lineTrackingKP*error;
-
   float newVelRight = avgLineFollowVel + effort;
   float newVelLeft = avgLineFollowVel - effort;
 
-  FrontRightMotor.setVelocity(newVelRight*gearRatio, velocityUnits::rpm);
+  FrontRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
   BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
-
-  FrontLeftMotor.setVelocity(newVelLeft*gearRatio, velocityUnits::rpm);
+  FrontLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
   BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
 }
 
 void autoStraight(float rotationSpeed, bool forward) {
   int direction = 1;
   if (forward == false) direction = -1;
-  FrontLeftMotor.setVelocity(direction*rotationSpeed*gearRatio, velocityUnits::rpm);
+  FrontLeftMotor.setVelocity(direction*rotationSpeed, velocityUnits::rpm);
   FrontLeftMotor.spin(directionType::fwd);
-  FrontRightMotor.setVelocity(direction*rotationSpeed*gearRatio, velocityUnits::rpm);
+  FrontRightMotor.setVelocity(direction*rotationSpeed, velocityUnits::rpm);
   FrontRightMotor.spin(directionType::fwd);
   BackLeftMotor.setVelocity(direction*rotationSpeed, velocityUnits::rpm);
   BackLeftMotor.spin(directionType::fwd);
@@ -110,8 +113,8 @@ void autoStraight(float rotationSpeed, bool forward) {
 void autoTurn(float turnDegrees, bool left) {
   int direction = 1;
   if (left == false) direction = -1;
-  FrontLeftMotor.rotateFor(-direction*turnDegrees*gearRatio, rotationUnits::rev);
-  FrontRightMotor.rotateFor(direction*turnDegrees*gearRatio, rotationUnits::rev);
+  FrontLeftMotor.rotateFor(-direction*turnDegrees, rotationUnits::rev);
+  FrontRightMotor.rotateFor(direction*turnDegrees, rotationUnits::rev);
   BackLeftMotor.rotateFor(-direction*turnDegrees, rotationUnits::rev);
   BackRightMotor.rotateFor(direction*turnDegrees, rotationUnits::rev);
 }
@@ -135,9 +138,9 @@ void autoGrab(float armPosition) {
 void controlRobot() {
   float straightSpeed = Controller1.Axis3.value()*2;
   float turnSpeed = Controller1.Axis4.value();
-  FrontLeftMotor.setVelocity(straightSpeed*gearRatio + turnSpeed*gearRatio, velocityUnits::rpm);
+  FrontLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
   FrontLeftMotor.spin(directionType::fwd);
-  FrontRightMotor.setVelocity(straightSpeed*gearRatio - turnSpeed*gearRatio, velocityUnits::rpm);
+  FrontRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
   FrontRightMotor.spin(directionType::fwd);
   BackLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
   BackLeftMotor.spin(directionType::fwd);
@@ -246,7 +249,7 @@ void autonomous(void) {
   bool complete = false;
 
   while (!complete) {
-    if (movementChecker()) lineTracking();
+    if (movementChecker()) lineTracking(true);
   }
 }
 
