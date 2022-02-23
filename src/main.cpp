@@ -34,15 +34,21 @@ using namespace std;
 // A global instance of competition
 competition Competition;
 
-sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
-sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
+//sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
+//sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
 
 bool calibration = true;
 bool buttonAPushed = false;
 bool liftActive = false;
 
-const float lineTrackingKP = 0.2;
+const float lineTrackingWhiteKP = 0.05;
 const int avgLineFollowVel = 50;
+const float lineTrackingWhiteKD = 1;
+float prevLTWError = 0;
+
+const float lineTrackingBlackKP = 0.05;
+const float lineTrackingBlackKD = 1;
+float prevLTBError = 0;
 
 const float liftState[] = {40, 80, 240, 380, 500, 640};
 int currentLiftState;
@@ -51,6 +57,16 @@ int currentArmState;
 
 int prevRightLineVal;
 int prevLeftLineVal;
+
+enum {RAMP, WAITING, PIZZASEARCH, DORMSEARCH, APPROACHING, LIFTING, GRABBING, RELEASING};
+
+bool hasPizza = false;
+
+int currentDorm = 0;
+
+int currentState = RAMP;
+
+bool reverseMovement = false;
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -97,6 +113,38 @@ void lineTracking(bool darkLine) {
   BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
 }
 
+void lineTrackingBlack() {
+  int curRightTrackerVal = RightLineTracker.reflectivity();
+  int curLeftTrackerVal = LeftLineTracker.reflectivity();
+
+  int error = curRightTrackerVal-curLeftTrackerVal;
+
+  float effort = lineTrackingBlackKP*error + lineTrackingBlackKD*prevLTBError;
+  prevLTBError = error;
+
+  float newVelRight = avgLineFollowVel + effort;
+  float newVelLeft = avgLineFollowVel - effort;
+
+  FrontRightMotor.setVelocity(newVelRight*gearRatio, velocityUnits::rpm);
+  BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
+
+  FrontLeftMotor.setVelocity(newVelLeft*gearRatio, velocityUnits::rpm);
+  BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
+}
+
+bool checkLineTrack() {
+  bool retVal = false;
+  if (currentState == PIZZASEARCH || currentState == RAMP) {
+    retVal = true;
+  }
+  return retVal;
+}
+
+void handleLineTrack() {
+  if (currentState == PIZZASEARCH) lineTrackingWhite();
+  else if (currentState == RAMP) lineTrackingBlack();
+}
+
 void autoStraight(float rotationSpeed, bool forward) {
   int direction = 1;
   if (forward == false) direction = -1;
@@ -135,40 +183,6 @@ void autoGrab(float armPosition) {
   GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
 }
 
-void controlRobot() {
-  float straightSpeed = Controller1.Axis3.value()*2;
-  float turnSpeed = Controller1.Axis4.value();
-  FrontLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
-  FrontLeftMotor.spin(directionType::fwd);
-  FrontRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
-  FrontRightMotor.spin(directionType::fwd);
-  BackLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
-  BackLeftMotor.spin(directionType::fwd);
-  BackRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
-  BackRightMotor.spin(directionType::fwd);
-}
-
-void controlLift() {
-  if (Controller1.Axis2.value() != 0 && liftActive == false) {
-    if (Controller1.Axis2.value() > 0 && currentLiftState < 6 - 1) {
-      currentLiftState++;
-    }
-    else if (Controller1.Axis2.value() < 0 && currentLiftState > 0) {
-      currentLiftState--;
-    }
-    liftActive = true;
-    cout << currentLiftState;
-    cout << " \n";
-  }
-  else if (Controller1.Axis2.value() == 0 && liftActive == true) {
-    liftActive = false;
-  }
-  LeftLiftMotor.setVelocity(-100, velocityUnits::rpm);
-  RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
-  LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
-  RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
-}
-
 void centerRobot() {
   bool buttonX = Controller1.ButtonX.pressing();
   if (buttonX == true) {
@@ -193,6 +207,68 @@ void handleGrab() {
   }
 }
 
+bool checkGrabAuto() {
+  bool retVal = false;
+
+  Vision.takeSnapshot(Vision__PIZZABOX);
+  if (Vision.objectCount > 0) retVal = true;
+
+  Vision.takeSnapshot(Vision__GOLDENPIZZA);
+  if (Vision.objectCount > 0) retVal = true;
+
+  return retVal;
+}
+
+void handleRobotControl() {
+  float straightSpeed = Controller1.Axis3.value();
+  float turnSpeed = Controller1.Axis4.value();
+  FrontLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
+  FrontLeftMotor.spin(directionType::fwd);
+  FrontRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
+  FrontRightMotor.spin(directionType::fwd);
+  BackLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
+  BackLeftMotor.spin(directionType::fwd);
+  BackRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
+  BackRightMotor.spin(directionType::fwd);
+}
+
+bool checkRobotControl() {
+  float straightSpeed = Controller1.Axis3.value();
+  float turnSpeed = Controller1.Axis4.value();
+  bool retVal = false;
+
+  if (straightSpeed != 0 || turnSpeed != 0) retVal = true;
+
+  return retVal;
+}
+
+void handleLiftControl() {
+  LeftLiftMotor.setVelocity(-100, velocityUnits::rpm);
+  RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
+  LeftLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
+  RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
+}
+
+bool checkLiftControl() {
+  int retVal = false;
+  if (Controller1.Axis2.value() != 0 && liftActive == false) {
+    if (Controller1.Axis2.value() > 0 && currentLiftState < 6 - 1) {
+      currentLiftState++;
+    }
+    else if (Controller1.Axis2.value() < 0 && currentLiftState > 0) {
+      currentLiftState--;
+    }
+    liftActive = true;
+    retVal = true;
+    cout << currentLiftState;
+    cout << " \n";
+  }
+  else if (Controller1.Axis2.value() == 0 && liftActive == true) {
+    liftActive = false;
+  }
+  return retVal;
+}
+
 bool checkGrabControl() {
   bool buttonA = Controller1.ButtonA.pressing();
   bool retVal = false;
@@ -203,10 +279,6 @@ bool checkGrabControl() {
     buttonAPushed = false;
   }
   return retVal;
-}
-
-void checkGrabAuto() {
-  Vision.takeSnapshot(Vision__PIZZABOX);
 }
 
 void calibrateArm() {
@@ -244,9 +316,8 @@ bool movementChecker() {
 /*---------------------------------------------------------------------------*/
 void autonomous(void) {
   cout << "auto\n";
-  calibrateArm();
+  //calibrateArm();
   calibration = false;
-  bool complete = false;
 
   while (!complete) {
     if (movementChecker()) lineTracking(true);
@@ -280,11 +351,10 @@ void usercontrol(void) {
     wait(20, msec);
     
     if (calibration == false) {
-      controlRobot();
-      controlLift();
+      if (checkRobotControl()) handleRobotControl();
+      if (checkLiftControl()) handleLiftControl();
       if (checkGrabControl()) handleGrab();
     }
-    
   }
 }
 
