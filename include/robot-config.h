@@ -10,8 +10,6 @@ extern motor FrontLeftMotor;
 extern motor FrontRightMotor;
 extern motor BackLeftMotor;
 extern motor BackRightMotor;
-extern motor LeftLiftMotor;
-extern motor RightLiftMotor;
 extern motor GrabMotor;
 extern sonar LeftRangeFinder;
 extern sonar RightRangeFinder;
@@ -25,6 +23,7 @@ extern signature Vision__SIG_5;
 extern signature Vision__SIG_6;
 extern signature Vision__SIG_7;
 extern vision Vision;
+extern motor_group MotorGroup5;
 
 /**
  * Used to initialize code/tasks/devices added using tools in VEXcode Pro.
