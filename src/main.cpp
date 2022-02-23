@@ -41,14 +41,10 @@ bool calibration = true;
 bool buttonAPushed = false;
 bool liftActive = false;
 
-const float lineTrackingWhiteKP = 0.05;
+const float lineTrackingKP = 0.05;
 const int avgLineFollowVel = 50;
-const float lineTrackingWhiteKD = 1;
-float prevLTWError = 0;
-
-const float lineTrackingBlackKP = 0.05;
-const float lineTrackingBlackKD = 1;
-float prevLTBError = 0;
+const float lineTrackingKD = 1;
+float prevLTError = 0;
 
 const float liftState[] = {40, 80, 240, 380, 500, 640};
 int currentLiftState;
@@ -101,32 +97,14 @@ void lineTracking(bool darkLine) {
   }
   
   int error = curRightTrackerVal-curLeftTrackerVal;
-  float effort = lineTrackingKP*error;
+  float effort = lineTrackingKP*error + lineTrackingKD*prevLTError;
+  prevLTError = error;
   float newVelRight = avgLineFollowVel + effort;
   float newVelLeft = avgLineFollowVel - effort;
 
   FrontRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
   BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
   FrontLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
-  BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
-}
-
-void lineTrackingBlack() {
-  int curRightTrackerVal = RightLineTracker.reflectivity();
-  int curLeftTrackerVal = LeftLineTracker.reflectivity();
-
-  int error = curRightTrackerVal-curLeftTrackerVal;
-
-  float effort = lineTrackingBlackKP*error + lineTrackingBlackKD*prevLTBError;
-  prevLTBError = error;
-
-  float newVelRight = avgLineFollowVel + effort;
-  float newVelLeft = avgLineFollowVel - effort;
-
-  FrontRightMotor.setVelocity(newVelRight*gearRatio, velocityUnits::rpm);
-  BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
-
-  FrontLeftMotor.setVelocity(newVelLeft*gearRatio, velocityUnits::rpm);
   BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
 }
 
@@ -139,8 +117,8 @@ bool checkLineTrack() {
 }
 
 void handleLineTrack() {
-  if (currentState == PIZZASEARCH) lineTrackingWhite();
-  else if (currentState == RAMP) lineTrackingBlack();
+  if (currentState == PIZZASEARCH) lineTracking(true);
+  else if (currentState == RAMP) lineTracking(false);
 }
 
 void autoStraight(float rotationSpeed, bool forward) {
@@ -316,6 +294,7 @@ void autonomous(void) {
   cout << "auto\n";
   //calibrateArm();
   calibration = false;
+  bool complete = false;
 
   while (!complete) {
     if (movementChecker()) lineTracking(true);
