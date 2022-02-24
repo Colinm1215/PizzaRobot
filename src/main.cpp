@@ -12,7 +12,7 @@
 // LeftLineTracker      line          E               
 // RightLineTracker     line          F               
 // Vision               vision        8               
-// MotorGroup5          motor_group   5, 6            
+// LiftMotors           motor_group   5, 6            
 // ---- END VEXCODE CONFIGURED DEVICES ----
 // ---- START VEXCODE CONFIGURED DEVICES ----
 // Robot Configuration:
@@ -28,84 +28,7 @@
 // LeftLineTracker      line          E               
 // RightLineTracker     line          F               
 // Vision               vision        8               
-// MotorGroup5          motor_group   5, 6            
-// ---- END VEXCODE CONFIGURED DEVICES ----
-// ---- START VEXCODE CONFIGURED DEVICES ----
-// Robot Configuration:
-// [Name]               [Type]        [Port(s)]
-// Controller1          controller                    
-// FrontLeftMotor       motor         1               
-// FrontRightMotor      motor         2               
-// BackLeftMotor        motor         3               
-// BackRightMotor       motor         4               
-// MotorGroup5        motor         5               
-// RightLiftMotor       motor         6               
-// GrabMotor            motor         7               
-// LeftRangeFinder      sonar         A, B            
-// RightRangeFinder     sonar         C, D            
-// LeftLineTracker      line          E               
-// RightLineTracker     line          F               
-// Vision               vision        8               
-// ---- END VEXCODE CONFIGURED DEVICES ----
-// ---- START VEXCODE CONFIGURED DEVICES ----
-// Robot Configuration:
-// [Name]               [Type]        [Port(s)]
-// Controller1          controller                    
-// FrontLeftMotor       motor         1               
-// FrontRightMotor      motor         2               
-// BackLeftMotor        motor         3               
-// BackRightMotor       motor         4               
-// MotorGroup5        motor         5               
-// RightLiftMotor       motor         6               
-// GrabMotor            motor         7               
-// LeftRangeFinder      sonar         A, B            
-// RightRangeFinder     sonar         C, D            
-// LeftLineTracker      line          E               
-// RightLineTracker     line          F               
-// Vision               vision        8               
-// ---- END VEXCODE CONFIGURED DEVICES ----
-// ---- START VEXCODE CONFIGURED DEVICES ----
-// Robot Configuration:
-// [Name]               [Type]        [Port(s)]
-// Controller1          controller                    
-// FrontLeftMotor       motor         1               
-// FrontRightMotor      motor         2               
-// BackLeftMotor        motor         3               
-// BackRightMotor       motor         4               
-// MotorGroup5        motor         5               
-// RightLiftMotor       motor         6               
-// GrabMotor            motor         7               
-// LeftRangeFinder      sonar         A, B            
-// RightRangeFinder     sonar         C, D            
-// LeftLineTracker      line          E               
-// RightLineTracker     line          F               
-// Vision               vision        8               
-// ---- END VEXCODE CONFIGURED DEVICES ----
-/*----------------------------------------------------------------------------*/
-/*                                                                            */
-/*    Module:       main.cpp                                                  */
-/*    Author:       C:\Users\camre                                            */
-/*    Created:      Thu Feb 17 2022                                           */
-/*    Description:  V5 project                                                */
-/*                                                                            */
-/*----------------------------------------------------------------------------*/
-
-// ---- START VEXCODE CONFIGURED DEVICES ----
-// Robot Configuration:
-// [Name]               [Type]        [Port(s)]
-// Controller1          controller                    
-// FrontLeftMotor       motor         1               
-// FrontRightMotor      motor         2               
-// BackLeftMotor        motor         3               
-// BackRightMotor       motor         4               
-// MotorGroup5        motor         5               
-// RightLiftMotor       motor         6               
-// GrabMotor            motor         7               
-// LeftRangeFinder      sonar         A, B            
-// RightRangeFinder     sonar         C, D            
-// LeftLineTracker      line          E               
-// RightLineTracker     line          F               
-// Vision               vision        8               
+// LiftMotors          motor_group   5, 6            
 // ---- END VEXCODE CONFIGURED DEVICES ----
 
 #include "vex.h"
@@ -120,17 +43,18 @@ competition Competition;
 //sonar LeftRangeFinder = sonar(Brain.ThreeWirePort.A);
 //sonar RightRangeFinder = sonar(Brain.ThreeWirePort.C);
 
-bool calibration = true;
+bool autoComplete = true;
 bool buttonAPushed = false;
 bool liftActive = false;
 
-const float lineTrackingKP = 0.1;
+const float lineTrackingKP = 0.5;
 const int avgLineFollowVel = 20;
 const float lineTrackingKD = 0.05;
 float prevLTError = 0;
 
-const float liftState[] = {40, 80, 240, 380, 500, 640};
+const float liftState[] = {27, 80, 250, 400, 540, 690};
 int currentLiftState;
+int transitionLiftState;
 const float armState[] = {-110, -280};
 int currentArmState;
 
@@ -159,8 +83,6 @@ bool complete = false;
 /*  not every time that the robot is disabled.                               */
 /*---------------------------------------------------------------------------*/
 
-void nothing() {}
-
 void pre_auton(void) {
   // Initializing Robot Configuration. DO NOT REMOVE!
   vexcodeInit();
@@ -187,8 +109,8 @@ void lineTracking(bool darkLine) {
   int error = curRightTrackerVal-curLeftTrackerVal;
   float effort = lineTrackingKP*error;
   prevLTError = error;
-  float newVelRight = avgLineFollowVel - effort;
-  float newVelLeft = avgLineFollowVel + effort;
+  float newVelRight = avgLineFollowVel + effort;
+  float newVelLeft = avgLineFollowVel - effort;
 
   cout << curRightTrackerVal << " RIGHT \n";
   cout << curLeftTrackerVal << " LEFT \n";
@@ -198,10 +120,10 @@ void lineTracking(bool darkLine) {
   FrontLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
   BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
 
-  //FrontRightMotor.spin(directionType::fwd);
-  //BackRightMotor.spin(directionType::fwd);
-  //FrontLeftMotor.spin(directionType::fwd);
-  //BackLeftMotor.spin(directionType::fwd);
+  FrontRightMotor.spin(directionType::fwd);
+  BackRightMotor.spin(directionType::fwd);
+  FrontLeftMotor.spin(directionType::fwd);
+  BackLeftMotor.spin(directionType::fwd);
 }
 
 bool checkLineTrack() {
@@ -243,11 +165,9 @@ void autoLift(int level) {
   int prevState = currentState;
   currentState = LIFTING;
   currentLiftState = level;
-  if (MotorGroup5.velocity(velocityUnits::rpm) == 0) {
-    MotorGroup5.setVelocity(100, velocityUnits::rpm);
-    //RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
-    MotorGroup5.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
-    //RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, true);
+  if (LiftMotors.velocity(velocityUnits::rpm) == 0) {
+    LiftMotors.setVelocity(100, velocityUnits::rpm);
+    LiftMotors.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
   }
   currentState = prevState;
 }
@@ -256,7 +176,7 @@ void autoGrab(float armPosition) {
   int prevState = currentState;
   currentState = (armPosition == 0) ? GRABBING : RELEASING;
   currentArmState = armPosition;
-  GrabMotor.setVelocity(100, velocityUnits::rpm);
+  GrabMotor.setVelocity(-100, velocityUnits::rpm);
   GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
   currentState = prevState;
 }
@@ -264,13 +184,13 @@ void autoGrab(float armPosition) {
 void centerRobot() {
   bool buttonX = Controller1.ButtonX.pressing();
   if (buttonX == true) {
-    MotorGroup5.stop();
+    LiftMotors.stop();
     const float kp = 0.2;
     float speed = 2.0;
     float leftDistance = LeftRangeFinder.distance(distanceUnits::cm)/100;
     float rightDistance = RightRangeFinder.distance(distanceUnits::cm)/100;
     float effort = leftDistance - rightDistance;
-    MotorGroup5.setVelocity(effort, velocityUnits::rpm);
+    LiftMotors.setVelocity(effort, velocityUnits::rpm);
     //RightLiftMotor.setVelocity(-effort, velocityUnits::rpm);
   }
 }
@@ -352,28 +272,35 @@ bool checkRobotControl() {
 }
 
 void handleLiftControl() {
-  int vel = Controller1.Axis2.value();
-  MotorGroup5.setVelocity(vel, percentUnits::pct);
+  /*int vel = Controller1.Axis2.value();
+  LiftMotors.setVelocity(vel, percentUnits::pct);
   //RightLiftMotor.setVelocity(-100, velocityUnits::rpm);
-  MotorGroup5.spin(directionType::fwd);
-  //RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
+  LiftMotors.spin(directionType::fwd);
+  //RightLiftMotor.spinTo(liftState[currentLiftState], rotationUnits::deg, false);*/
+  int direction = Controller1.Axis2.value();
+  cout << "checking" << endl;
+  if (transitionLiftState < 5 && direction > 0) {
+    cout << "up" << endl;
+    transitionLiftState++;
+  }
+  else if (transitionLiftState > 0 && direction < 0) {
+    transitionLiftState--;
+    cout << "down" << endl;
+  }
+  LiftMotors.setVelocity(100, velocityUnits::rpm);
+  LiftMotors.spinTo(liftState[transitionLiftState], rotationUnits::deg, false);
 }
 
 bool checkLiftControl() {
+  currentLiftState = LiftMotors.position(rotationUnits::deg);
   int retVal = false;
-  if (Controller1.Axis2.value() != 0) {
-   /*  if (Controller1.Axis2.value() > 0 && currentLiftState < 6 - 1) {
-      currentLiftState++;
-    }
-    else if (Controller1.Axis2.value() < 0 && currentLiftState > 0) {
-      currentLiftState--;
-    } */
-    //liftActive = true;
+  if (Controller1.Axis2.value() != 0 && currentLiftState >= liftState[transitionLiftState]-5 && currentLiftState <= liftState[transitionLiftState]+5) {
     retVal = true;
-   //cout << currentLiftState;
-    //cout << " \n";
-  } else {
-    MotorGroup5.setVelocity(0, percentUnits::pct);
+
+  }
+  else if (currentLiftState >= liftState[transitionLiftState]-5 && currentLiftState <= liftState[transitionLiftState]+5) {}
+  else {
+    LiftMotors.setVelocity(0, percentUnits::pct);
   }
   return retVal;
 }
@@ -391,11 +318,11 @@ bool checkGrabControl() {
 }
 
 void calibrateArm() {
-  cout << MotorGroup5.position(rotationUnits::deg) << endl;
+  cout << LiftMotors.position(rotationUnits::deg) << endl;
   cout << "Calibrate Arm\n";
   /* autoLift(3);
   wait(500, msec);
-  while(MotorGroup5.velocity(velocityUnits::rpm) > 20) {}
+  while(LiftMotors.velocity(velocityUnits::rpm) > 20) {}
   autoGrab(0);
   wait(500, msec);
   while(GrabMotor.velocity(velocityUnits::rpm) > 2) {}
@@ -404,12 +331,23 @@ void calibrateArm() {
   GrabMotor.resetPosition();
   GrabMotor.setVelocity(0, velocityUnits::rpm);
   GrabMotor.spin(directionType::fwd);
-  cout << "ending calibration\n";
+  cout << "ending autoComplete\n";
   autoLift(0);
   autoGrab(1); */
-  autoLift(5);
-  while (!MotorGroup5.isDone()) {}
+  autoLift(2);
+  while (!LiftMotors.isDone()) {}
   cout << "step 1" << endl;
+  GrabMotor.setVelocity(100, velocityUnits::rpm);
+  GrabMotor.spin(directionType::fwd);
+  wait(500, msec);
+  while(GrabMotor.velocity(velocityUnits::rpm) > 2) {
+    cout << GrabMotor.velocity(velocityUnits::rpm) << "\n";
+    wait(20, msec);
+  }
+  cout << "ended\n";
+  GrabMotor.setVelocity(0, velocityUnits::rpm);
+  GrabMotor.resetRotation();
+  GrabMotor.resetPosition();
   autoGrab(1);
   while (!GrabMotor.isDone()) {}
   cout << "step 2" << endl;
@@ -420,8 +358,8 @@ void calibrateArm() {
   while (!GrabMotor.isDone()) {}
   cout << "fin" << endl;
 
-  autoLift(2);
-  while (!MotorGroup5.isDone()) {}
+  autoLift(1);
+  while (!LiftMotors.isDone()) {}
 }
 
 bool movementChecker() {
@@ -438,14 +376,17 @@ bool movementChecker() {
 /*  You must modify the code to add your own robot specific commands here.   */
 /*---------------------------------------------------------------------------*/
 void autonomous(void) {
-  //calibrateArm();
+  calibrateArm();
   cout << "auto\n";
-  calibration = false;
   //currentState = PIZZASEARCH;
 
   while (true) {
     lineTracking(false);
-  } 
+  }
+  wait(3000, msec);
+  autoLift(2);
+  transitionLiftState = 2;
+  autoComplete = false;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -474,7 +415,7 @@ void usercontrol(void) {
     // You can also call functions from here; keep in mind they will loop
     wait(20, msec);
     
-    if (calibration == false) {
+    if (autoComplete == false) {
       if (checkRobotControl()) handleRobotControl();
       if (checkLiftControl()) handleLiftControl();
       if (checkGrabControl()) handleGrab();

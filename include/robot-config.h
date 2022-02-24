@@ -23,7 +23,7 @@ extern signature Vision__SIG_5;
 extern signature Vision__SIG_6;
 extern signature Vision__SIG_7;
 extern vision Vision;
-extern motor_group MotorGroup5;
+extern motor_group LiftMotors;
 
 /**
  * Used to initialize code/tasks/devices added using tools in VEXcode Pro.

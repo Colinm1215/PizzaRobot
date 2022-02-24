@@ -28,9 +28,9 @@ signature Vision__SIG_6 = signature (6, 0, 0, 0, 0, 0, 0, 3, 0);
 signature Vision__SIG_7 = signature (7, 0, 0, 0, 0, 0, 0, 3, 0);
 vision Vision = vision (PORT8, 36, Vision__PIZZABOX, Vision__GOLDENPIZZA, Vision__SIG_3, Vision__SIG_4, Vision__SIG_5, Vision__SIG_6, Vision__SIG_7);
 /*vex-vision-config:end*/
-motor MotorGroup5MotorA = motor(PORT5, ratio18_1, false);
-motor MotorGroup5MotorB = motor(PORT6, ratio18_1, true);
-motor_group MotorGroup5 = motor_group(MotorGroup5MotorA, MotorGroup5MotorB);
+motor LiftMotorsMotorA = motor(PORT5, ratio18_1, false);
+motor LiftMotorsMotorB = motor(PORT6, ratio18_1, true);
+motor_group LiftMotors = motor_group(LiftMotorsMotorA, LiftMotorsMotorB);
 
 // VEXcode generated functions
 // define variable for remote controller enable/disable
