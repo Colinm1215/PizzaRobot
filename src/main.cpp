@@ -30,13 +30,13 @@ bool buttonAPushed = false;
 bool liftActive = false;
 bool buttonXPushed = false;
 
-const float lineTrackingKP = 0.35;
+const float lineTrackingKP = 0.1;
 const int avgLineFollowVel = 20;
 const float lineTrackingKD = 0.05;
 float prevLTError = 0;
 bool lineTrackingFinished = false;
 
-const float liftState[] = {27, 130, 250, 405, 540, 690};
+const float liftState[] = {27, 130, 250, 405, 540, 690, 360};
 int currentLiftState;
 int transitionLiftState;
 const float armState[] = {-110, -240};
@@ -52,6 +52,7 @@ int currentState = RAMP;
 bool reverseMovement = false;
 bool hasPizza = false;
 bool complete = false;
+
 
 /*---------------------------------------------------------------------------*/
 /*                          Pre-Autonomous Functions                         */
@@ -73,6 +74,27 @@ void pre_auton(void) {
   // it will not run
 }
 
+bool wallClose() {
+    task::sleep(100);
+    float rightDist = RightRangeFinder.distance(distanceUnits::cm);
+    float leftDist = LeftRangeFinder.distance(distanceUnits::cm);
+    float avgDist = 0;
+    if (rightDist > 0) avgDist += rightDist;
+    if (leftDist > 0) avgDist += leftDist;
+    avgDist /= 2.0;
+    return (avgDist <= 25.0);
+}
+
+void moveBackToLine() {
+  bool atLine = false;
+  int curRightTrackerVal = 100-RightLineTracker.reflectivity();
+  int curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
+  if (curRightTrackerVal < 80 && curLeftTrackerVal < 80) {
+    atLine = true;
+  }
+
+}
+
 void lineTracking(bool darkLine) {
   while (lineTrackingFinished == false) {
     wait(20, msec);
@@ -83,6 +105,10 @@ void lineTracking(bool darkLine) {
       curLeftTrackerVal = 100-LeftLineTracker.reflectivity();
       if (curRightTrackerVal < 80 && curLeftTrackerVal < 80) {
         lineTrackingFinished = true;
+      FrontLeftMotor.stop();
+      FrontRightMotor.stop();
+      BackLeftMotor.stop();
+      BackRightMotor.stop();
       }
     }
     else {
@@ -90,37 +116,58 @@ void lineTracking(bool darkLine) {
       curLeftTrackerVal = LeftLineTracker.reflectivity();
       if (curRightTrackerVal < 10 && curLeftTrackerVal < 10) {
         lineTrackingFinished = true;
+      FrontLeftMotor.stop();
+      FrontRightMotor.stop();
+      BackLeftMotor.stop();
+      BackRightMotor.stop();
       }
     }
+    if (!lineTrackingFinished) {
     int error = curRightTrackerVal-curLeftTrackerVal;
     float effort = lineTrackingKP*error;
-    prevLTError = error;
+    prevLTError =  effort;
     float newVelRight = avgLineFollowVel - effort;
     float newVelLeft = avgLineFollowVel + effort;
     
-    //cout << curRightTrackerVal << " RIGHT \n";
-    //cout << curLeftTrackerVal << " LEFT \n";
-    Brain.Screen.clearScreen();
-    Brain.Screen.print(curRightTrackerVal);
-    Brain.Screen.print(" RIGHT \n");
+    cout << curRightTrackerVal << " RIGHT \n";
+    cout << curLeftTrackerVal << " LEFT \n";
+   // Brain.Screen.clearScreen();
+    /* Brain.Screen.print(curRightTrackerVal);
+    Brain.Screen.print(" RIGHT ");
     Brain.Screen.newLine();
     Brain.Screen.print(curLeftTrackerVal);
-    Brain.Screen.print(" LEFT \n");
-    Brain.Screen.newLine();
+    Brain.Screen.print(" LEFT ");
+    Brain.Screen.newLine(); */
 
-    /*FrontRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
+     Brain.Screen.clearLine(1,color::black);
+    Brain.Screen.clearLine(2,color::black);
+        Brain.Screen.setCursor(1,0);
+        Brain.Screen.print("RIGHT %d",curRightTrackerVal);
+        Brain.Screen.setCursor(2,0);
+        Brain.Screen.print("LEFT %d",curLeftTrackerVal);
+    Brain.Screen.render();
+
+    FrontRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
     BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
     FrontLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
-    BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);*/
-    FrontRightMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
+    BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
+    /* FrontRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
     BackRightMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
     FrontLeftMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
-    BackLeftMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
+    BackLeftMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm); */
 
     FrontRightMotor.spin(directionType::fwd);
     BackRightMotor.spin(directionType::fwd);
     FrontLeftMotor.spin(directionType::fwd);
     BackLeftMotor.spin(directionType::fwd);
+    }
+    if (wallClose() && currentState == PIZZASEARCH && currentLiftState > 1) {
+      lineTrackingFinished = true;
+      FrontLeftMotor.stop();
+      FrontRightMotor.stop();
+      BackLeftMotor.stop();
+      BackRightMotor.stop();
+    }
   }
   lineTrackingFinished = false;
 }
@@ -470,7 +517,6 @@ void autonomous(void) {
     }
     //move towards pizzaria
     wait(1000, msec);
-    autoLift(3);
     lineTracking(false);
     //turn into pizzaria
       //for testing far side
@@ -479,19 +525,27 @@ void autonomous(void) {
       autoStraight(1, true);
     wait(1000, msec);
     autoTurn(90, normalFalse);
+    currentState = PIZZASEARCH;
     //move to get pizza
+    handleCenterRobot();
+    wait(2000, msec);
+    autoLift(6);
+    wait(2000, msec);
     autoStraight(7, true);
-    wait(1000, msec);
+    //lineTracking(false);
+    wait(5000, msec);
     autoGrab(0);
     wait(1000, msec);
     //move backwards with pizza
-    autoStraight(5 + liftingLevel - 2, false);
+    autoStraight(7, false);
     wait(2000, msec);
+    autoLift(1);
     autoTurn(90, normalFalse);
+    wait(5000,msec);
     cout << "should turn" << endl;
     //move forwards towards dorms
-    autoLift(1);
-    lineTracking(false);
+    //autoLift(1);
+    //lineTracking(false);
     autoStraight(35, true);
     if (liftingLevel < 6) {
       //turn to dorm and adjust
@@ -516,7 +570,7 @@ void autonomous(void) {
       }
       autoGrab(1);
       //retreat from dorm with pizza delivered
-      autoStraight(15, false);
+      autoStraight(5 + liftingLevel - 2, false);
       autoLift(1);
       wait(1000, msec);
       lineTracking(false);
