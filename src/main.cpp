@@ -527,7 +527,7 @@ void autonomous(void) {
       autoLift(1);
       autoTurn(90, normalFalse);
       //move over speed bump
-      autoStraight(40, true);
+      autoStraight(30, true);
       lineTracking(false);
       //move towards inside building
       autoStraight(12, false);
