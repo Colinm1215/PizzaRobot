@@ -202,10 +202,10 @@ void autoTurn(float turnDegrees, bool left) {
   if (left == false) direction = -1;
   //11.5 is wheel diameter
   float revolutions = (direction*turnDegrees * 11.5) / (360*4);
-  FrontLeftMotor.rotateFor(-revolutions, rotationUnits::rev, false);
-  FrontRightMotor.rotateFor(revolutions, rotationUnits::rev, false);
-  BackLeftMotor.rotateFor(-revolutions, rotationUnits::rev, false);
-  BackRightMotor.rotateFor(revolutions, rotationUnits::rev, true);
+  FrontLeftMotor.spinFor(-revolutions, rotationUnits::rev, 25, rpm, false);
+  FrontRightMotor.spinFor(revolutions, rotationUnits::rev, 25, rpm, false);
+  BackLeftMotor.spinFor(-revolutions, rotationUnits::rev, 25, rpm,  false);
+  BackRightMotor.spinFor(revolutions, rotationUnits::rev, 25, rpm,  true);
 }
 
 void autoLift(int level) {
@@ -331,8 +331,10 @@ bool checkGrabAuto() {
 }
 
 void handleRobotControl() {
-  float straightSpeed = Controller1.Axis3.value();
-  float turnSpeed = Controller1.Axis4.value();
+  float straightSpeed = Controller1.Axis3.value()/2;
+  float turnSpeed = Controller1.Axis4.value()/4;
+
+  if (straightSpeed < 0) straightSpeed /= 2;
   FrontLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
   FrontLeftMotor.spin(directionType::fwd);
   FrontRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
@@ -474,6 +476,10 @@ void calibrateArm() {
   GrabMotor.resetPosition();
   autoGrab(1);
   while (!GrabMotor.isDone()) {}
+  autoGrab(0);
+  while (!GrabMotor.isDone()) {}
+  autoGrab(1);
+  while (!GrabMotor.isDone()) {}
   autoLift(3);
   while (!LiftMotors.isDone()) {}
 }
@@ -507,6 +513,7 @@ void autonomous(void) {
   autoStraight(20, true);
   autoLift(1);
   lineTracking(true);
+  autoLift(1);
   lineTracking(false);
   autoTurn(90, normalFalse);
 
@@ -516,32 +523,31 @@ void autonomous(void) {
       liftingLevel = 5;
     }
     //move towards pizzaria
-    wait(1000, msec);
+    wait(500, msec);
     lineTracking(false);
     //turn into pizzaria
       //for testing far side
       //autoStraight(2, true);
       //for testing ramp side
-      autoStraight(1, true);
-    wait(1000, msec);
+      //autoStraight(1, true);
     autoTurn(90, normalFalse);
     currentState = PIZZASEARCH;
     //move to get pizza
     handleCenterRobot();
-    wait(2000, msec);
-    autoLift(6);
-    wait(2000, msec);
+    wait(500, msec);
+    autoLift(3);
+    while (!LiftMotors.isDone()) {}
     autoStraight(7, true);
-    //lineTracking(false);
     wait(5000, msec);
     autoGrab(0);
-    wait(1000, msec);
+    while (!GrabMotor.isDone()) {}
     //move backwards with pizza
     autoStraight(7, false);
-    wait(2000, msec);
+    wait(500, msec);
     autoLift(1);
+    while (!LiftMotors.isDone()) {}
     autoTurn(90, normalFalse);
-    wait(5000,msec);
+    wait(500,msec);
     cout << "should turn" << endl;
     //move forwards towards dorms
     //autoLift(1);
@@ -551,34 +557,33 @@ void autonomous(void) {
       //turn to dorm and adjust
       autoTurn(90, normalFalse);
       autoStraight(7, false);
-      wait(2000, msec);
+      wait(500, msec);
+      autoLift(3);
+      while (!LiftMotors.isDone()) {}
       handleCenterRobot();
-      wait(2000, msec);
+      wait(500, msec);
       autoLift(liftingLevel);
-      wait(1000, msec);
+      while (!LiftMotors.isDone()) {}
       //move arm into dorm
       //moveToDistance(8);
       //autoStraight(8, true);
-      if (liftingLevel == 2) {
-        moveToDistance(9);
-      }
-      else if (liftingLevel == 3) {
-        moveToDistance(9.5);
-      }
-      else if (liftingLevel == 5) {
-        moveToDistance(5);
-      }
+      autoStraight(9, true);
+      if (liftingLevel > 3) autoStraight(2, true);
+      wait(500, msec);
       autoGrab(1);
+      while (!GrabMotor.isDone()) {}
       //retreat from dorm with pizza delivered
-      autoStraight(5 + liftingLevel - 2, false);
+      autoStraight(10, false);
+      wait(500, msec);
       autoLift(1);
-      wait(1000, msec);
+      while (!LiftMotors.isDone()) {}
       lineTracking(false);
       autoTurn(90, normalFalse);
     }
     else {
       lineTracking(false);
       autoLift(1);
+      while (!LiftMotors.isDone()) {}
       autoTurn(90, normalFalse);
       //move over speed bump
       autoStraight(40, true);
@@ -591,7 +596,7 @@ void autonomous(void) {
       //deposit pizza
       wait(1000, msec);
       autoLift(1);
-      wait(1000, msec);
+      while (!LiftMotors.isDone()) {}
       autoStraight(10, true);
       autoGrab(1);
     }
