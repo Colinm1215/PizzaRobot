@@ -30,7 +30,7 @@ bool buttonAPushed = false;
 bool liftActive = false;
 bool buttonXPushed = false;
 
-const float lineTrackingKP = 0.35;
+const float lineTrackingKP = 0.1;
 const int avgLineFollowVel = 20;
 const float lineTrackingKD = 0.05;
 float prevLTError = 0;
@@ -112,10 +112,17 @@ void lineTracking(bool darkLine) {
     BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
     FrontLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
     BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);*/
+    if (darkLine) {
+      FrontRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
+    BackRightMotor.setVelocity(newVelRight, velocityUnits::rpm);
+    FrontLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
+    BackLeftMotor.setVelocity(newVelLeft, velocityUnits::rpm);
+    } else {
     FrontRightMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
     BackRightMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
     FrontLeftMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
     BackLeftMotor.setVelocity(avgLineFollowVel, velocityUnits::rpm);
+    }
 
     FrontRightMotor.spin(directionType::fwd);
     BackRightMotor.spin(directionType::fwd);
@@ -123,6 +130,7 @@ void lineTracking(bool darkLine) {
     BackLeftMotor.spin(directionType::fwd);
   }
   lineTrackingFinished = false;
+  cout << "end line tracking" << endl;
 }
 
 bool checkLineTrack() {
@@ -146,6 +154,7 @@ void autoStraight(float distanceToTravel, bool forward) {
   FrontRightMotor.spinFor(revolutions, vex::rev, 50, rpm, false);
   BackLeftMotor.spinFor(revolutions, vex::rev, 50, rpm, false);
   BackRightMotor.spinFor(revolutions, vex::rev, 50, rpm, true);
+  cout << "auto straight" << endl;
 }
 
 void autoTurn(float turnDegrees, bool left) {
@@ -155,10 +164,11 @@ void autoTurn(float turnDegrees, bool left) {
   if (left == false) direction = -1;
   //11.5 is wheel diameter
   float revolutions = (direction*turnDegrees * 11.5) / (360*4);
-  FrontLeftMotor.rotateFor(-revolutions, rotationUnits::rev, false);
-  FrontRightMotor.rotateFor(revolutions, rotationUnits::rev, false);
-  BackLeftMotor.rotateFor(-revolutions, rotationUnits::rev, false);
-  BackRightMotor.rotateFor(revolutions, rotationUnits::rev, true);
+  FrontLeftMotor.spinFor(-revolutions, rotationUnits::rev, 25, rpm, false);
+  FrontRightMotor.spinFor(revolutions, rotationUnits::rev, 25, rpm, false);
+  BackLeftMotor.spinFor(-revolutions, rotationUnits::rev, 25, rpm, false);
+  BackRightMotor.spinFor(revolutions, rotationUnits::rev, 25, rpm, true);
+  cout << "auto turn" << endl;
 }
 
 void autoLift(int level) {
@@ -170,6 +180,7 @@ void autoLift(int level) {
     LiftMotors.spinTo(liftState[currentLiftState], rotationUnits::deg, false);
   }
   currentState = prevState;
+  cout << "auto lift" << endl;
 }
 
 void autoGrab(float armPosition) {
@@ -179,6 +190,7 @@ void autoGrab(float armPosition) {
   GrabMotor.setVelocity(-100, velocityUnits::rpm);
   GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
   currentState = prevState;
+  cout << "auto grab" << endl;
 }
 
 bool checkCenterRobot() {
@@ -234,6 +246,7 @@ void handleCenterRobot() {
   BackLeftMotor.spin(directionType::fwd);
   cout << "left sensor distance " << leftDistance << endl;
   cout << "right sensor distance " << rightDistance << endl;
+  cout << "center robot" << endl;
 }
 
 void handleGrab() {
@@ -244,6 +257,7 @@ void handleGrab() {
     GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
     complete = true;
   }
+  cout << "handle grab" << endl;
 }
 
 void handleGrabAuto() {
@@ -255,6 +269,7 @@ void handleGrabAuto() {
     GrabMotor.spinTo(armState[currentArmState], rotationUnits::deg, false);
     complete = true;
   }
+  cout << "handle grab auto" << endl;
 }
 
 bool checkGrabAutoCam() {
@@ -284,8 +299,10 @@ bool checkGrabAuto() {
 }
 
 void handleRobotControl() {
-  float straightSpeed = Controller1.Axis3.value();
-  float turnSpeed = Controller1.Axis4.value();
+  float straightSpeed = Controller1.Axis3.value()/2;
+  float turnSpeed = Controller1.Axis4.value()/4;
+
+  if (straightSpeed < 0) straightSpeed /= 2;
   FrontLeftMotor.setVelocity(straightSpeed + turnSpeed, velocityUnits::rpm);
   FrontLeftMotor.spin(directionType::fwd);
   FrontRightMotor.setVelocity(straightSpeed - turnSpeed, velocityUnits::rpm);
@@ -392,6 +409,7 @@ void moveToDistance(float distanceToSet) {
   BackLeftMotor.setVelocity(0, velocityUnits::rpm);
   FrontRightMotor.setVelocity(0, velocityUnits::rpm);
   BackRightMotor.setVelocity(0, velocityUnits::rpm);
+  cout << "move to distance" << endl;
 }
 
 void calibrateArm() {
@@ -429,6 +447,7 @@ void calibrateArm() {
   while (!GrabMotor.isDone()) {}
   autoLift(3);
   while (!LiftMotors.isDone()) {}
+  cout << "end claibration" << endl;
 }
 
 bool movementChecker() {
@@ -542,7 +561,45 @@ void autonomous(void) {
       autoGrab(1);
     }
   }
-  autoComplete = false;
+
+
+  /*autoLift(3);
+  autoTurn(90, true);
+  //move to get pizza
+  autoStraight(7, true);
+  wait(1000, msec);
+  autoGrab(0);
+  wait(1000, msec);
+  //move backwards with pizza
+  autoStraight(5, false);
+  wait(2000, msec);
+  autoTurn(90, normalFalse);
+  cout << "should turn" << endl;
+  //move forwards towards dorms
+  autoLift(1);
+  lineTracking(false);
+  autoStraight(35, true);
+  //turn to dorm and adjust
+  autoTurn(90, normalFalse);
+  autoStraight(7, false);
+  wait(2000, msec);
+  handleCenterRobot();
+  wait(2000, msec);
+  autoLift(2);
+  wait(1000, msec);
+  //move arm into dorm
+  //moveToDistance(8);
+  //autoStraight(8, true);
+  moveToDistance(9);
+  autoGrab(1);
+  //retreat from dorm with pizza delivered
+  autoStraight(15, false);
+  autoLift(1);
+  wait(1000, msec);
+  lineTracking(false);
+  autoTurn(90, normalFalse);*/
+
+autoComplete = false;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -557,8 +614,30 @@ void autonomous(void) {
 void usercontrol(void) {
   //This will run the auto function but it will end when any controller button is pressed
   autonomous();
-  cout << "teleop\n";
-
+  //calibrateArm();
+  /*wait(2, sec);
+  autoGrab(0);
+  
+    FrontRightMotor.setVelocity(0, percentUnits::pct);
+    FrontLeftMotor.setVelocity(0, percentUnits::pct);
+    BackRightMotor.setVelocity(0, percentUnits::pct);
+    BackLeftMotor.setVelocity(0, percentUnits::pct);
+  FrontLeftMotor.spin(fwd);
+  FrontRightMotor.spin(fwd);
+  BackRightMotor.spin(fwd);
+  BackLeftMotor.spin(fwd);
+  int i = 20;
+  for (int d = 0; d < 101; d+=15) {
+    wait(1000, msec);
+    FrontRightMotor.setVelocity(i, percentUnits::pct);
+    FrontLeftMotor.setVelocity(i, percentUnits::pct);
+    BackRightMotor.setVelocity(i, percentUnits::pct);
+    BackLeftMotor.setVelocity(i, percentUnits::pct);
+    cout << i << endl;
+    i *= -1;
+  }
+  cout << "teleop\n";*/
+  autoComplete = false;
   while (1) {
     // This is the main execution loop for the user control program.
     // Each time through the loop your program should update motor + servo
