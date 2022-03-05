@@ -522,7 +522,8 @@ void demoDayExtraFunctionality() {
   autoTurn(90, normalFalse);
 }
 
-//grabs a pizza from the pizzaria and then goes into the construction zone to put a pizza on the first floor of faraday
+//has 3 pre-made code sections for going into the construction zone, bring and depositing the pizza in the construction zone,
+//and deposit a pizza on the opposite side of the construction zone
 void competitionDay() {
   //moves into the construction aone
     autoTurn(180, true);
