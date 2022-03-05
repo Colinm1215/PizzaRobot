@@ -35,7 +35,7 @@ bool liftActive = false;
 
 
 const float lineTrackingKP = 0.1;
-const int avgLineFollowVel = 20;
+int avgLineFollowVel = 20;
 float prevLTError = 0;
 bool lineTrackingFinished = false;
 
@@ -77,7 +77,13 @@ void pre_auton(void) {
 }
 
 //fuction for using the line trackers
-void lineTracking(bool darkLine) {
+void lineTracking(bool darkLine, bool fast) {
+  if (fast) {
+    avgLineFollowVel = 80;
+  }
+  else {
+    avgLineFollowVel = 20;
+  }
   while (lineTrackingFinished == false) {
     wait(20, msec);
     int curRightTrackerVal;
@@ -167,20 +173,24 @@ void moveToDistance(float distanceToSet) {
 }
 
 //makes the robot travel straight for a set distance in inches
-void autoStraight(float distanceToTravel, bool forward) {
+void autoStraight(float distanceToTravel, bool forward, bool fast) {
+  int revSpeed = 50;
+  if (fast) {
+    revSpeed = 80;
+  }
   int direction = 1;
   if (forward == false) direction = -1;
   float revolutions = direction * distanceToTravel / (2 * 2 * M_PI);
-  FrontLeftMotor.spinFor(revolutions, vex::rev, 50, rpm, false);
-  FrontRightMotor.spinFor(revolutions, vex::rev, 50, rpm, false);
-  BackLeftMotor.spinFor(revolutions, vex::rev, 50, rpm, false);
-  BackRightMotor.spinFor(revolutions, vex::rev, 50, rpm, true);
+  FrontLeftMotor.spinFor(revolutions, vex::rev, revSpeed, rpm, false);
+  FrontRightMotor.spinFor(revolutions, vex::rev, revSpeed, rpm, false);
+  BackLeftMotor.spinFor(revolutions, vex::rev, revSpeed, rpm, false);
+  BackRightMotor.spinFor(revolutions, vex::rev, revSpeed, rpm, true);
   cout << "auto straight" << endl;
 }
 
 //makes the robot turn for an amount of degrees
 void autoTurn(float turnDegrees, bool left) {
-  autoStraight(1, false);
+  autoStraight(1, false, false);
   wait(500, msec);
   int direction = 1;
   if (left == false) direction = -1;
@@ -311,7 +321,8 @@ void handleRobotControl() {
   float turnSpeed = Controller1.Axis4.value()/4;
   //speeds up robot if the button is held
   if (Controller1.ButtonL1.pressing()) {
-    straightSpeed *= 4;
+    straightSpeed *= 2;
+    turnSpeed *= 4;
   }
 
   if (straightSpeed < 0) straightSpeed /= 2;
@@ -386,10 +397,10 @@ void demoDay() {
 
   wait(1000, msec);
   
-  autoStraight(20, true);
+  autoStraight(20, true, false);
   autoLift(1);
-  lineTracking(true);
-  lineTracking(false);
+  lineTracking(true, false);
+  lineTracking(false, false);
   autoTurn(90, normalFalse);
 
   //lifting level normally starts at 2, 6 for testing over speed bump
@@ -400,31 +411,31 @@ void demoDay() {
     //move towards pizzaria
     wait(1000, msec);
     autoLift(3);
-    lineTracking(false);
+    lineTracking(false, false);
     //turn into pizzaria
       //for testing far side
       //autoStraight(2, true);
       //for testing ramp side
-      autoStraight(1, true);
+      autoStraight(1, true, false);
     wait(1000, msec);
     autoTurn(90, normalFalse);
     //move to get pizza
-    autoStraight(7, true);
+    autoStraight(7, true, false);
     wait(1000, msec);
     autoGrab(0);
     wait(1000, msec);
     //move backwards with pizza
-    autoStraight(5 + liftingLevel - 2, false);
+    autoStraight(5 + liftingLevel - 2, false, false);
     wait(2000, msec);
     autoTurn(90, normalFalse);
     //move forwards towards dorms
     autoLift(1);
-    lineTracking(false);
-    autoStraight(35, true);
+    lineTracking(false, false);
+    autoStraight(35, true, false);
     if (liftingLevel < 6) {
       //turn to dorm and adjust
       autoTurn(90, normalFalse);
-      autoStraight(7, false);
+      autoStraight(7, false, false);
       wait(2000, msec);
       handleCenterRobot();
       wait(2000, msec);
@@ -442,21 +453,21 @@ void demoDay() {
       }
       autoGrab(1);
       //retreat from dorm with pizza delivered
-      autoStraight(15, false);
+      autoStraight(15, false, false);
       autoLift(1);
       wait(1000, msec);
-      lineTracking(false);
+      lineTracking(false, false);
       autoTurn(90, normalFalse);
     }
     else {
-      lineTracking(false);
+      lineTracking(false, false);
       autoLift(1);
       autoTurn(90, normalFalse);
       //move over speed bump
-      autoStraight(30, true);
-      lineTracking(false);
+      autoStraight(30, true, false);
+      lineTracking(false, false);
       //move towards inside building
-      autoStraight(12, false);
+      autoStraight(12, false, false);
       //align robot to smaller dorm room
       autoTurn(90, normalFalse);
       handleCenterRobot();
@@ -464,7 +475,7 @@ void demoDay() {
       wait(1000, msec);
       autoLift(1);
       wait(1000, msec);
-      autoStraight(10, true);
+      autoStraight(10, true, false);
       autoGrab(1);
     }
   }
@@ -472,28 +483,29 @@ void demoDay() {
 
 //grabs a pizza from the pizzaria to put on the first floor of messenger
 void demoDayExtraFunctionality() {
+  calibrateArm();
   //Replace these values if testing on the opposite side of the ramp
-  bool normalTrue = true;
-  bool normalFalse = false;
+  bool normalTrue = false;
+  bool normalFalse = true;
   autoLift(3);
   autoTurn(90, true);
   //move to get pizza
-  autoStraight(7, true);
+  autoStraight(7, true, false);
   wait(1000, msec);
   autoGrab(0);
   wait(1000, msec);
   //move backwards with pizza
-  autoStraight(5, false);
+  autoStraight(5, false, false);
   wait(2000, msec);
   autoTurn(90, normalFalse);
   cout << "should turn" << endl;
   //move forwards towards dorms
   autoLift(1);
-  lineTracking(false);
-  autoStraight(35, true);
+  lineTracking(false, false);
+  autoStraight(35, true, false);
   //turn to dorm and adjust
   autoTurn(90, normalFalse);
-  autoStraight(7, false);
+  autoStraight(7, false, false);
   wait(2000, msec);
   handleCenterRobot();
   wait(2000, msec);
@@ -503,65 +515,77 @@ void demoDayExtraFunctionality() {
   moveToDistance(9);
   autoGrab(1);
   //retreat from dorm with pizza delivered
-  autoStraight(15, false);
+  autoStraight(15, false, false);
   autoLift(1);
   wait(1000, msec);
-  lineTracking(false);
+  lineTracking(false, false);
   autoTurn(90, normalFalse);
 }
 
 //grabs a pizza from the pizzaria and then goes into the construction zone to put a pizza on the first floor of faraday
 void competitionDay() {
+  //moves into the construction aone
+    autoTurn(180, true);
+    autoStraight(14, false, true);
+    autoStraight(12, false, false);
+    autoStraight(25, false, true);
+    autoComplete = true;
   //These values are based on being on ramp side
-  bool normalTrue = true;
+  /*bool normalTrue = true;
   bool normalFalse = false;
+  wait(500, msec);
+  autoStraight(10, true, true);
+  autoTurn(180, normalTrue);
   autoLift(3);
-  autoTurn(90, normalTrue);
-  if (LeftRangeFinder.distance(distanceUnits::in) > 30) {
-    normalTrue = false;
-    normalFalse = true;
-    autoTurn(180, false);
-  }
+  //autoStraight(2, true, false);
+  wait(500, msec);
   //move to get pizza
-  autoStraight(7, true);
+  autoStraight(7, true, true);
   wait(1000, msec);
   autoGrab(0);
   wait(1000, msec);
   //move backwards with pizza
-  autoStraight(5, false);
-  wait(2000, msec);
-  autoTurn(90, normalFalse);
-  //move towards speed bump
-  autoLift(1);
-  lineTracking(false);
-  autoStraight(45, true);
-  lineTracking(false);
-  //turn towards the bump
-  autoLift(1);
-  autoTurn(90, normalFalse);
-  //move over speed bump
-  autoStraight(30, true);
-  lineTracking(false);
-  //move towards inside building
-  autoStraight(12, false);
-  //align robot to smaller dorm room
-  autoTurn(90, normalFalse);
-  autoStraight(4, false);
-  handleCenterRobot();
-  //deposit pizza
-  wait(1000, msec);
-  autoLift(3);
-  wait(1000, msec);
-  autoStraight(12, true);
-  autoGrab(1);
-  autoStraight(6, true);
-  autoLift(0);
+  autoStraight(5, false, true);*/
+  //construction zone
+    /*autoTurn(90, normalFalse);
+    //move towards speed bump
+    autoLift(1);
+    autoStraight(52, true, true);
+    lineTracking(false, false);
+    //turn towards the bump
+    autoLift(2);
+    autoTurn(90, normalFalse);
+    //move over speed bump
+    //autoStraight(40, true, true);
+    autoStraight(14, true, true);
+    autoStraight(6, true, false);
+    autoStraight(20, true, true);
+    //align robot to smaller dorm room
+    autoTurn(90, normalFalse);
+    //deposit pizza
+    autoLift(2);
+    wait(1000, msec);
+    autoStraight(12, true, true);
+    autoGrab(1);
+    autoStraight(8, false, true);
+    autoLift(0);*/
+  //center zone
+    /*autoTurn(180, normalFalse);
+    autoLift(1);
+    autoStraight(36, true, true);
+    autoTurn(90, normalTrue);
+    //deposit pizza
+    autoLift(2);
+    autoStraight(20, true, true);
+    autoGrab(1);
+    autoStraight(8, false, true);
+    autoLift(0);*/
 }
 
 //performs the autonomous code
 void autonomous(void) {
-
-  autoComplete = true;
+  calibrateArm();
+  //competitionDay();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -575,7 +599,7 @@ void autonomous(void) {
 /*---------------------------------------------------------------------------*/
 void usercontrol(void) {
   //This will run the auto function but it will end when any controller button is pressed
-  autonomous();
+  //autonomous();
   while (1) {
     // This is the main execution loop for the user control program.
     // Each time through the loop your program should update motor + servo
@@ -587,12 +611,12 @@ void usercontrol(void) {
     // You can also call functions from here; keep in mind they will loop
     wait(20, msec);
     
-    if (autoComplete == true) {
+    //if (autoComplete == true) {
       if (checkRobotControl()) handleRobotControl();
       if (checkLiftControl()) handleLiftControl();
       if (checkGrabControl()) handleGrab();
       if (checkCenterRobot()) handleCenterRobot();
-    }
+    //}
   }
 }
 
